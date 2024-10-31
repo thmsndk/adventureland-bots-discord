@@ -3,6 +3,7 @@ import { Client, IntentsBitField } from "discord.js"
 import fs from "fs"
 import interactionCreate from "./interactionCreate.js"
 import ready from "./listeners/ready.js"
+import { initializeMerchantTracker } from "./merchantTracker.js"
 
 const credentials = JSON.parse(fs.readFileSync("../../../credentials.json", "utf-8"))
 await AL.Game.getGData(true, false)
@@ -17,4 +18,6 @@ const client = new Client({
 ready(client)
 interactionCreate(client)
 
-client.login(credentials.discord.auth)
+// Initialize the merchant tracking with the client instance
+initializeMerchantTracker(client, "1079859790831951914") // Pass the trade channel ID
+
