@@ -1,0 +1,10 @@
+# docker-compose.yml
+version: '3.8'
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    volumes:
+      - .:/workspace:cached # Mounts current directory into /workspace
+    command: "sleep infinity" # Keeps the container running for development
