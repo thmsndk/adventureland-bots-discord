@@ -160,23 +160,37 @@ async function fetchAndCompareMerchants(client: Client, tradeChannelId: string) 
         const newMerchants: PullMerchantsCharData[] = await AL.Game.getMerchants()
 
         if (previousMerchants) {
+            // We only want to inspect changes in a merchants inventory, so if a new merchant appears with new items, we won't catch them. but we won't spam restock events either every time they open/close thier stand
+            const filteredMerchants = newMerchants.filter((merchant) => {
+                const merchantHadStandOpenLastScan = previousMerchants.find((x) => x.name === merchant.name)
+
+                if (merchantHadStandOpenLastScan) {
+                    return true
+                }
+
+                console.log(
+                    `${merchant.name} was filtered out from new merchants because they've just opened their stand`,
+                )
+
+                return false
+            })
+
             // TODO: Remove merchants after a certain period of inactivity / not being present in new merchants
             // Handle players opening and closing their stands and thus not being present in the dataset.
             for (const merchant of previousMerchants) {
                 if (!newMerchants.find((x) => x.name === merchant.name)) {
-                    newMerchants.push(merchant)
+                    console.log(`${merchant.name} added from previous merchants`)
+                    newMerchants.push(merchant) // add for next run because their stand is now closed
+                    filteredMerchants.push(merchant) // add for analyze because their stand is now closed
                 }
             }
-
-            // We only want to inspect changes in a merchants inventory, so if a new merchant appears with new items, we won't catch them. but we won't spam restock events either every time they open/close thier stand
-            const filteredMerchants = newMerchants.filter((merchant) =>
-                previousMerchants.find((x) => x.name === merchant.name),
-            )
 
             const events = analyzeMerchantData(previousMerchants, filteredMerchants)
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             if (Object.keys(events).some((key) => events[key].length > 0)) {
                 await postEventsEmbeds(client, tradeChannelId, events)
+            } else {
+                console.log("no events")
             }
         }
 
