@@ -361,6 +361,8 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
 
     for (const itemId in allItemsOldData) {
         const itemData = allItemsNewData[itemId]
+        const previousItemData = allItemsOldData[itemId]
+
         if (!itemData) {
             if (!events[itemId]) events[itemId] = []
 
@@ -374,7 +376,13 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             })
         }
 
-        if (itemData && itemData.sell.length == 0 && itemData.buy.length > 0) {
+        if (
+            itemData &&
+            itemData.sell.length == 0 &&
+            itemData.buy.length > 0 &&
+            previousItemData &&
+            previousItemData.sell.length > 0
+        ) {
             if (!events[itemId]) events[itemId] = []
             // No merchants are selling this item anymore
             const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
