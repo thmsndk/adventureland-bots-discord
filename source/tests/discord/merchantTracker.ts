@@ -257,7 +257,7 @@ function processMerchantData(data: PullMerchantsCharData[]): ItemDataById {
 }
 
 type EventTypes =
-    | "deal"
+    | "hotSellOrder"
     | "priceIncrease"
     | "priceDecrease"
     | "itemUnavailable"
@@ -279,8 +279,6 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
 
     // Events
 
-    // TODO: - HOT DEAL - A merchant wants to sell an item at a cheaper price than other merchants
-    // TODO: - STONKS - An item is increased in price e.g primlings going from 2.5m to 3m e.g. no merchant is selling this item at a lower price
     // TODO: - A merchants wants to buy an item at a higher price than existing buy orders, perhaps sell orders
 
     // TODO: restock, listed more of the item, or more quantity if stackable items
@@ -312,6 +310,39 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
                     type: "itemBeingSold",
                 })
             })
+        } else {
+            // TODO: What if someone is selling an item cheaper, than others are buying it, is it then a HOT DEAL? Do we want to broadcast that?
+
+            // a new price that is cheaper than previously, is a HOT DEAL, do we even want to label it as a hot deal, or just a price decrease?
+            const cheaperThanPrevious = itemData.sell
+                .filter((x) => x.item.price < previousItemData.minSellPrice)
+                .sort((a, b) => a.item.price - b.item.price)[0]
+            if (cheaperThanPrevious) {
+                if (!events[itemId]) events[itemId] = []
+
+                // TODO: how about how much cheaper it is? e.g. the price diff?
+                events[itemId].push({
+                    item: cheaperThanPrevious.item,
+                    merchant: cheaperThanPrevious.merchant,
+                    // type: "hotSellOrder",
+                    type: "priceDecrease",
+                })
+            }
+
+            // - STONKS - An item is increased in price e.g primlings going from 2.5m to 3m e.g. no merchant is selling this item at a lower price
+            const moreExpensiveThanPrevious = itemData.sell
+                .filter((x) => x.item.price > previousItemData.maxSellPrice && x.item.price <= itemData.minSellPrice)
+                .sort((a, b) => a.item.price - b.item.price)[0]
+            if (moreExpensiveThanPrevious) {
+                if (!events[itemId]) events[itemId] = []
+
+                // TODO: How much more expensive is it?
+                events[itemId].push({
+                    item: moreExpensiveThanPrevious.item,
+                    merchant: moreExpensiveThanPrevious.merchant,
+                    type: "priceIncrease",
+                })
+            }
         }
     }
 
@@ -428,7 +459,7 @@ async function postEventsEmbeds(
     }
 
     const eventTypeStyles: Partial<Record<EventTypes, EventTypeStyle>> = {
-        deal: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
+        hotSellOrder: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
         priceIncrease: { emoji: "📈", title: "Price Increase", color: 0xff0000, message: "The price just went up!" },
         priceDecrease: { emoji: "📉", title: "Price Decrease", color: 0x32cd32, message: "Lucky day! Lower price!" },
         itemUnavailable: {
