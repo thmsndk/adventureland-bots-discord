@@ -83,7 +83,7 @@ export function testInitializeMerchantTracker(client: Client, tradeChannelId: st
                 // it's also a merchant price decrease for merchant A
                 trade1: { rid: "test1", name: "sword", level: 1, price: 900, p: "shiny", b: false },
                 trade2: { rid: "test2", name: "shield", level: 1, price: 1500, p: "shiny", b: false },
-                // New item (listed by a merchant, noone else is selling this, but is someone buying it? and what is the price comparison?)
+                // New item (listed by a merchant, noone else was selling this, but is someone buying it? and what is the price comparison?)
                 trade3: { rid: "test7", name: "dagger", level: 1, price: 800, p: "shiny", b: false },
             },
             skin: "skin1",
@@ -103,6 +103,8 @@ export function testInitializeMerchantTracker(client: Client, tradeChannelId: st
                 trade1: { rid: "test3", name: "sword", level: 1, price: 1200, p: "shiny", b: false },
                 // Price increase (STONKS) this is now the cheapest bow
                 trade2: { rid: "test4", name: "bow", level: 1, price: 1300, p: "shiny", b: false },
+                // New item (listed by a merchant, noone else was selling this, but is someone buying it? and what is the price comparison?)
+                trade3: { rid: "test7", name: "dagger", level: 1, price: 800, p: "shiny", b: false },
             },
             skin: "skin2",
             cx: {},
@@ -292,13 +294,24 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
     // TODO: wait with internal merchant changes for now
 
     for (const itemId in allItemsNewData) {
-        if (!allItemsOldData[itemId]) {
+        const itemData = allItemsNewData[itemId]
+        const previousItemData = allItemsOldData[itemId]
+
+        if (!previousItemData || previousItemData.sell.length == 0) {
             if (!events[itemId]) events[itemId] = []
 
             // One ore more merchants are now selling an item that was not sold before
             // TODO: what about existing buy orders?
             // If it's cheaper than existing buy orders it's a HOT DEAL
             // if it's more expensive, it's just being sold now
+
+            itemData.sell.forEach(({ merchant, item }) => {
+                events[itemId].push({
+                    item,
+                    merchant,
+                    type: "itemBeingSold",
+                })
+            })
         }
     }
 
@@ -431,6 +444,12 @@ async function postEventsEmbeds(
             message: "This item is no longer being sold",
         },
         itemAvailableAgain: { emoji: "🎊", title: "Item Restocked", color: 0x1e90ff, message: "Restocked and ready!" },
+        itemBeingSold: {
+            emoji: "💸",
+            title: "Item Restocked!",
+            color: 0x1e90ff,
+            message: "Item is now being sold again",
+        },
     }
 
     // TODO: Perhaps a message per item with embeds?
@@ -462,6 +481,7 @@ async function postEventsEmbeds(
             //     })
             // }
 
+            // TODO: one embed, with multiple merchant fields, we don't know the order of the events, group/ sort by type
             const embed = new EmbedBuilder()
                 .setTitle(`${style.emoji} ${style.title}: ${gItem.name} (${event.item.name})`)
                 .setDescription(`*Event Type:* **${event.type}**\n${style.message}`)
