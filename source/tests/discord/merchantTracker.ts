@@ -247,8 +247,8 @@ async function postEventsEmbeds(
 
     const eventTypeStyles = {
         deal: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
-        priceIncrease: { emoji: "⬆️", title: "Price Increase", color: 0xff0000, message: "The price just went up!" },
-        priceDecrease: { emoji: "⬇️", title: "Price Decrease", color: 0x32cd32, message: "Lucky day! Lower price!" },
+        priceIncrease: { emoji: "📈", title: "Price Increase", color: 0xff0000, message: "The price just went up!" },
+        priceDecrease: { emoji: "📉", title: "Price Decrease", color: 0x32cd32, message: "Lucky day! Lower price!" },
         itemUnavailable: {
             emoji: "🚫",
             title: "Item Unavailable",
@@ -258,6 +258,9 @@ async function postEventsEmbeds(
         itemAvailableAgain: { emoji: "🎊", title: "Item Restocked", color: 0x1e90ff, message: "Restocked and ready!" },
     }
 
+    // TODO: Perhaps a message per item with embeds?
+    // TODO: or a single embed for an item, with all relevant events
+    // TODO: For some reason i'm generating hot deal, price increase, item restock for sword
     for (const [, eventList] of Object.entries(events)) {
         eventList.forEach((event) => {
             // Lookup for gItem details
