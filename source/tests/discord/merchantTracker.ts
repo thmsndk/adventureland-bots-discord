@@ -285,29 +285,28 @@ function processMerchantData(data: PullMerchantsCharData[]): ItemDataById {
 
 type EventTypes =
     | "hotSellOrder"
-    | "priceIncrease"
-    | "priceDecrease"
+    | "priceIncreaseSellOrder"
+    | "priceDecreaseSellOrder"
     | "itemUnavailable"
     | "itemNoLongerSold"
     | "itemAvailableAgain" // technically both buy and sell orders
     | "itemBeingSold"
 
-function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerchantsCharData[]) {
-    const events: {
-        [itemId: string]: {
-            item: ItemDataTrade
-            merchant: PullMerchantsCharData | undefined
-            type: EventTypes
-        }[]
-    } = {}
+type Event = {
+    item: ItemDataTrade
+    merchant: PullMerchantsCharData | undefined
+    type: EventTypes
+}
 
-    const allItemsNewData = processMerchantData(newData)
-    const allItemsOldData = processMerchantData(oldData)
+function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerchantsCharData[]) {
+    console.log("analyzeMerchantData")
+
+    const events: Record<string, Event[]> = {}
+
+    const previousItemsData = processMerchantData(oldData)
+    const itemsData = processMerchantData(newData)
 
     // Events
-
-    // TODO: - A merchants wants to buy an item at a higher price than existing buy orders, perhaps sell orders
-
     // TODO: restock, listed more of the item, or more quantity if stackable items
 
     // TODO: - Merchant internal changes
@@ -318,9 +317,9 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
 
     // TODO: wait with internal merchant changes for now
 
-    for (const itemId in allItemsNewData) {
-        const itemData = allItemsNewData[itemId]
-        const previousItemData = allItemsOldData[itemId]
+    for (const itemId in itemsData) {
+        const itemData = itemsData[itemId]
+        const previousItemData = previousItemsData[itemId]
 
         if (!previousItemData || previousItemData.sell.length == 0) {
             if (!events[itemId]) events[itemId] = []
@@ -352,7 +351,7 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
                     item: cheaperThanPrevious.item,
                     merchant: cheaperThanPrevious.merchant,
                     // type: "hotSellOrder",
-                    type: "priceDecrease",
+                    type: "priceDecreaseSellOrder",
                 })
             }
 
@@ -367,15 +366,17 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
                 events[itemId].push({
                     item: moreExpensiveThanPrevious.item,
                     merchant: moreExpensiveThanPrevious.merchant,
-                    type: "priceIncrease",
+                    type: "priceIncreaseSellOrder",
                 })
             }
+
+            // TODO: - A merchants wants to buy an item at a higher price than existing buy orders
         }
     }
 
-    for (const itemId in allItemsOldData) {
-        const itemData = allItemsNewData[itemId]
-        const previousItemData = allItemsOldData[itemId]
+    for (const itemId in previousItemsData) {
+        const itemData = itemsData[itemId]
+        const previousItemData = previousItemsData[itemId]
 
         if (!itemData) {
             if (!events[itemId]) events[itemId] = []
@@ -388,6 +389,8 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
                 merchant: undefined,
                 type: "itemUnavailable",
             })
+
+            // console.log("itemUnavailable", previousItemData, itemData)
         }
 
         if (
@@ -410,77 +413,24 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
         }
     }
 
-    // for (const [itemId, newItems] of Object.entries(allItemsNewData)) {
-    //     const lowestPrice = Math.min(...newItems.map(({ item }) => item.price))
-
-    //     for (const { merchant, item } of newItems) {
-    //         const oldItem = allItemsOldData[itemId]?.find((old) => old.price === item.price)
-
-    //         if (!oldItem) {
-    //             if (!events[itemId]) events[itemId] = []
-    //             events[itemId].push({
-    //                 item,
-    //                 merchant,
-    //                 type: item.price === lowestPrice ? "deal" : "priceIncrease",
-    //             })
-    //         } else if (oldItem.price !== item.price) {
-    //             if (!events[itemId]) events[itemId] = []
-    //             events[itemId].push({
-    //                 item,
-    //                 merchant,
-    //                 type: item.price < oldItem.price ? "priceDecrease" : "priceIncrease",
-    //             })
-    //         }
-    //     }
-    // }
-
-    // const availableItems = new Set(Object.keys(allItemsNewData))
-    // previouslyAvailableItems.forEach((itemId) => {
-    //     if (!availableItems.has(itemId)) {
-    //         if (!events[itemId]) events[itemId] = []
-    //         const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
-    //         // TODO: look up old item prices?
-    //         events[itemId].push({
-    //             item: { rid: itemId, name, level, price: 0, p },
-    //             merchant: undefined,
-    //             type: "itemUnavailable",
-    //         })
-    //     }
-    // })
-
-    // for (const itemId of availableItems) {
-    //     if (!previouslyAvailableItems.has(itemId)) {
-    //         if (!events[itemId]) events[itemId] = []
-    //         allItemsNewData[itemId].forEach(({ merchant, item }) => {
-    //             events[itemId].push({
-    //                 item,
-    //                 merchant,
-    //                 type: "itemAvailableAgain",
-    //             })
-    //         })
-    //     }
-    // }
-
-    // previouslyAvailableItems = availableItems
-
     return events
 }
-async function postEventsEmbeds(
-    client: Client,
-    tradeChannelId: string,
-    events: {
-        [itemId: string]: {
-            item: ItemDataTrade
-            merchant: PullMerchantsCharData
-            type: EventTypes
-        }[]
-    },
-) {
+
+async function postEventsEmbeds(client: Client, tradeChannelId: string, events: Record<string, Event[]>) {
     const tradeChannel = client.channels.cache.get(tradeChannelId) as TextChannel
     if (!tradeChannel) {
         console.error("Trade channel not found")
         return
     }
+
+    console.log("postEventsEmbeds")
+
+    if (Object.keys(events).length == 0) {
+        console.log("No events")
+        return
+    }
+
+    await tradeChannel.send({ content: "Recent changes on the market" })
 
     // TODO: A message per item with embeds? or an embed per item?
     // TODO: We gotta remember the limits of how many messages can be sent?
@@ -495,8 +445,18 @@ async function postEventsEmbeds(
 
     const eventTypeStyles: Partial<Record<EventTypes, EventTypeStyle>> = {
         hotSellOrder: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
-        priceIncrease: { emoji: "📈", title: "Price Increase", color: 0xff0000, message: "The price just went up!" },
-        priceDecrease: { emoji: "📉", title: "Price Decrease", color: 0x32cd32, message: "Lucky day! Lower price!" },
+        priceIncreaseSellOrder: {
+            emoji: "📈",
+            title: "Price Increase",
+            color: 0xff0000,
+            message: "The price just went up!",
+        },
+        priceDecreaseSellOrder: {
+            emoji: "📉",
+            title: "Price Decrease",
+            color: 0x32cd32,
+            message: "Lucky day! Lower price!",
+        },
         itemUnavailable: {
             emoji: "🚫",
             title: "Item Unavailable",
@@ -555,11 +515,12 @@ async function postEventsEmbeds(
                 .setTimestamp()
 
             if (event.merchant) {
+                // TODO: split server out into it's own column?
                 embed.addFields(
-                    { name: "Merchant", value: `${event.merchant?.name} - ${event.merchant?.server}`, inline: true },
+                    { name: "Merchant", value: `${event.merchant?.name}`, inline: true },
                     {
                         name: "🌍 Location",
-                        value: `${event.merchant?.map} (${event.merchant?.x}, ${event.merchant?.y})`,
+                        value: `${event.merchant?.server} | ${event.merchant?.map} (${event.merchant?.x}, ${event.merchant?.y})`,
                         inline: true,
                     },
                     { name: "💰 Price", value: ` **${event.item.price} gold**`, inline: true },
