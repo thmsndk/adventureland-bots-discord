@@ -151,7 +151,7 @@ export function testInitializeMerchantTracker(client: Client, tradeChannelId: st
     client.once("ready", () => {
         // Call the comparison function with the mock data
         const events = analyzeMerchantData(mockPreviousMerchants, mockNewMerchants)
-        void postEventsEmbeds(client, tradeChannelId, events)
+        void postEventsMessage(client, tradeChannelId, events)
     })
 }
 
@@ -187,7 +187,7 @@ async function fetchAndCompareMerchants(client: Client, tradeChannelId: string) 
             const events = analyzeMerchantData(previousMerchants, filteredMerchants)
             // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
             if (Object.keys(events).some((key) => events[key].length > 0)) {
-                await postEventsEmbeds(client, tradeChannelId, events)
+                await postEventsMessage(client, tradeChannelId, events)
             } else {
                 console.log("no events")
             }
@@ -428,68 +428,71 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
 
     return events
 }
-
-async function postEventsEmbeds(client: Client, tradeChannelId: string, events: Record<string, Event[]>) {
+async function postEventsMessage(client: Client, tradeChannelId: string, events: Record<string, Event[]>) {
     const tradeChannel = client.channels.cache.get(tradeChannelId) as TextChannel
     if (!tradeChannel) {
         console.error("Trade channel not found")
         return
     }
 
-    console.log("postEventsEmbeds")
+    console.log("postEventsMessage")
 
     if (Object.keys(events).length == 0) {
         console.log("No events")
         return
     }
 
-    await tradeChannel.send({ content: "Recent changes on the market" })
+    await postEventASCIIMessage(tradeChannel, events)
 
+    await postEventsEmbeds(tradeChannel, events)
+}
+
+type EventTypeStyle = {
+    emoji: string
+    title: string
+    color: number
+    message: string
+}
+
+const eventTypeStyles: Partial<Record<EventTypes, EventTypeStyle>> = {
+    hotSellOrder: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
+    priceIncreaseSellOrder: {
+        emoji: "📈",
+        title: "Price Increase",
+        color: 0xff0000,
+        message: "The price just went up!",
+    },
+    priceDecreaseSellOrder: {
+        emoji: "📉",
+        title: "Price Decrease",
+        color: 0x32cd32,
+        message: "Lucky day! Lower price!",
+    },
+    itemUnavailable: {
+        emoji: "🚫",
+        title: "Item Unavailable",
+        color: 0x808080,
+        message: "This item is no longer available, no one is buying or selling",
+    },
+    itemNoLongerSold: {
+        emoji: "🚫",
+        title: "Not Sold",
+        color: 0x808080,
+        message: "This item is no longer being sold",
+    },
+    itemAvailableAgain: { emoji: "🎊", title: "Item Restocked", color: 0x1e90ff, message: "Restocked and ready!" },
+    itemBeingSold: {
+        emoji: "💸",
+        title: "Item Restocked!",
+        color: 0x1e90ff,
+        message: "Item is now being sold again",
+    },
+}
+
+async function postEventsEmbeds(tradeChannel: TextChannel, events: Record<string, Event[]>) {
     // TODO: A message per item with embeds? or an embed per item?
     // TODO: We gotta remember the limits of how many messages can be sent?
     const embeds: EmbedBuilder[] = []
-
-    type EventTypeStyle = {
-        emoji: string
-        title: string
-        color: number
-        message: string
-    }
-
-    const eventTypeStyles: Partial<Record<EventTypes, EventTypeStyle>> = {
-        hotSellOrder: { emoji: "🔥", title: "HOT DEAL!", color: 0xff4500, message: "Snag it before it’s gone!" },
-        priceIncreaseSellOrder: {
-            emoji: "📈",
-            title: "Price Increase",
-            color: 0xff0000,
-            message: "The price just went up!",
-        },
-        priceDecreaseSellOrder: {
-            emoji: "📉",
-            title: "Price Decrease",
-            color: 0x32cd32,
-            message: "Lucky day! Lower price!",
-        },
-        itemUnavailable: {
-            emoji: "🚫",
-            title: "Item Unavailable",
-            color: 0x808080,
-            message: "This item is no longer available, no one is buying or selling",
-        },
-        itemNoLongerSold: {
-            emoji: "🚫",
-            title: "Not Sold",
-            color: 0x808080,
-            message: "This item is no longer being sold",
-        },
-        itemAvailableAgain: { emoji: "🎊", title: "Item Restocked", color: 0x1e90ff, message: "Restocked and ready!" },
-        itemBeingSold: {
-            emoji: "💸",
-            title: "Item Restocked!",
-            color: 0x1e90ff,
-            message: "Item is now being sold again",
-        },
-    }
 
     // TODO: Perhaps a message per item with embeds?
     // TODO: or a single embed for an item, with all relevant events
@@ -537,7 +540,6 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
                 .setTimestamp()
 
             if (event.merchant) {
-                // TODO: split server out into it's own column?
                 embed.addFields(
                     { name: "Merchant", value: `${event.merchant?.name}`, inline: true },
                     {
@@ -563,6 +565,69 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
     for (let i = 0; i < embeds.length; i += 10) {
         const batch = embeds.slice(i, i + 10)
         await tradeChannel.send({ embeds: batch })
+    }
+}
+
+async function postEventASCIIMessage(tradeChannel: TextChannel, events: Record<string, Event[]>) {
+    const maxMessageLength = 2000
+    let currentMessage = "📢 **Merchant Tracker Update** 📢\n"
+    currentMessage += "----------------------------------------\n"
+
+    for (const [itemId, eventList] of Object.entries(events)) {
+        // Generate item name and details
+        const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
+        for (const event of eventList) {
+            const titleName = getTitleName(event.item, AL.Game.G) ? `${getTitleName(event.item, AL.Game.G)} ` : ""
+            const itemLevel = event.item.level ? `+${event.item.level} ` : ""
+            const gItemName = AL.Game.G.items[event.item.name].name
+            const itemName = `${itemLevel}${titleName}${gItemName}`
+
+            let eventMessage = `🔹 **${itemName}** (${event.item.name})\n`
+            const style = eventTypeStyles[event.type]
+
+            // Create ASCII table for merchant info
+            let merchantTable = "```\n"
+            merchantTable += "+----------------+----------------------+\n"
+            merchantTable += "| Merchant       | Location             |\n"
+            merchantTable += "+----------------+----------------------+\n"
+
+            if (event.merchant) {
+                const merchantName = event.merchant.name.padEnd(15)
+                const location =
+                    `${event.merchant.server}, ${event.merchant.map} (${event.merchant.x}, ${event.merchant.y})`.padEnd(
+                        20,
+                    )
+                merchantTable += `| ${merchantName} | ${location} |\n`
+                merchantTable += "+----------------+----------------------+\n"
+            }
+
+            merchantTable += "```\n"
+
+            eventMessage += `\n${style.emoji} **${style.title}**: ${style.message}\n${merchantTable}`
+
+            if (event.previous) {
+                const trend = `${getPriceTrend(event.item.price, event.previous.item.price)}`
+                eventMessage += `📊 *Trend*: ${trend}\n`
+            }
+
+            eventMessage += "----------------------------------------\n"
+
+            // Check if adding this event would exceed the character limit
+            if (currentMessage.length + eventMessage.length > maxMessageLength) {
+                // Send the current message and start a new one
+                await tradeChannel.send(currentMessage)
+                currentMessage = "📢 **Merchant Tracker Update** 📢\n"
+                currentMessage += "----------------------------------------\n"
+            }
+
+            // Add the event message to the current message
+            currentMessage += eventMessage
+        }
+    }
+
+    // Send any remaining message content
+    if (currentMessage.length > 0) {
+        await tradeChannel.send(currentMessage)
     }
 }
 
