@@ -1,5 +1,6 @@
 import { Client, TextChannel, EmbedBuilder } from "discord.js"
 import AL, { PullMerchantsCharData, ItemDataTrade, ItemName, TitleName } from "alclient"
+import { abbreviateNumber, getTitleName } from "./utils.js"
 
 const FETCH_INTERVAL = 60000 // 1 minute interval for fetching merchants
 let previousMerchants: PullMerchantsCharData[] | null = null
@@ -168,9 +169,7 @@ async function fetchAndCompareMerchants(client: Client, tradeChannelId: string) 
                     return true
                 }
 
-                console.log(
-                    `${merchant.name} was filtered out from new merchants because they've just opened their stand`,
-                )
+                console.log(`${merchant.name} was filtered out from analysis because they've just opened their stand`)
 
                 return false
             })
@@ -179,7 +178,7 @@ async function fetchAndCompareMerchants(client: Client, tradeChannelId: string) 
             // Handle players opening and closing their stands and thus not being present in the dataset.
             for (const merchant of previousMerchants) {
                 if (!newMerchants.find((x) => x.name === merchant.name)) {
-                    console.log(`${merchant.name} added from previous merchants`)
+                    console.log(`${merchant.name} added from previous merchants because their stand is now closed`)
                     newMerchants.push(merchant) // add for next run because their stand is now closed
                     filteredMerchants.push(merchant) // add for analyze because their stand is now closed
                 }
@@ -489,6 +488,14 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
             // Lookup for gItem details
             const gItem = AL.Game.G.items[event.item.name]
 
+            let titleName = getTitleName(event.item, AL.Game.G)
+            if (titleName) {
+                titleName += " "
+            }
+
+            const itemLevel = event.item.level ? `+${event.item.level} ` : ""
+            const itemName = `${itemLevel}${titleName}${gItem.name}`
+
             const style = eventTypeStyles[event.type]
 
             // const embed = new EmbedBuilder()
@@ -509,7 +516,7 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
 
             // TODO: one embed, with multiple merchant fields, we don't know the order of the events, group/ sort by type
             const embed = new EmbedBuilder()
-                .setTitle(`${style.emoji} ${style.title}: ${gItem.name} (${event.item.name})`)
+                .setTitle(`${style.emoji} ${itemName} (${event.item.name}) - ${style.title}`)
                 .setDescription(`*Event Type:* **${event.type}**\n${style.message}`)
                 .setColor(style.color)
                 .setTimestamp()
@@ -523,7 +530,7 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
                         value: `${event.merchant?.server} | ${event.merchant?.map} (${event.merchant?.x}, ${event.merchant?.y})`,
                         inline: true,
                     },
-                    { name: "💰 Price", value: ` **${event.item.price} gold**`, inline: true },
+                    { name: "💰 Price", value: ` **${abbreviateNumber(event.item.price)} **`, inline: true },
                 )
             }
 
