@@ -295,6 +295,7 @@ type Event = {
     item: ItemDataTrade
     merchant: PullMerchantsCharData | undefined
     type: EventTypes
+    previous?: { item: ItemDataTrade; merchant: PullMerchantsCharData | undefined }
 }
 
 function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerchantsCharData[]) {
@@ -341,31 +342,39 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             // a new price that is cheaper than previously, is a HOT DEAL, do we even want to label it as a hot deal, or just a price decrease?
             const cheaperThanPrevious = itemData.sell
                 .filter((x) => x.item.price < previousItemData.minSellPrice)
+                // Sorted ascending
                 .sort((a, b) => a.item.price - b.item.price)[0]
             if (cheaperThanPrevious) {
                 if (!events[itemId]) events[itemId] = []
 
-                // TODO: how about how much cheaper it is? e.g. the price diff?
+                // previous sell price, sorted descending
+                const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
+
                 events[itemId].push({
                     item: cheaperThanPrevious.item,
                     merchant: cheaperThanPrevious.merchant,
                     // type: "hotSellOrder",
                     type: "priceDecreaseSellOrder",
+                    previous: previousItem,
                 })
             }
 
             // - STONKS - An item is increased in price e.g primlings going from 2.5m to 3m e.g. no merchant is selling this item at a lower price
             const moreExpensiveThanPrevious = itemData.sell
                 .filter((x) => x.item.price > previousItemData.maxSellPrice && x.item.price <= itemData.minSellPrice)
+                // Sorted ascending
                 .sort((a, b) => a.item.price - b.item.price)[0]
             if (moreExpensiveThanPrevious) {
                 if (!events[itemId]) events[itemId] = []
 
-                // TODO: How much more expensive is it?
+                // previous sell price, sorted descending
+                const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
+
                 events[itemId].push({
                     item: moreExpensiveThanPrevious.item,
                     merchant: moreExpensiveThanPrevious.merchant,
                     type: "priceIncreaseSellOrder",
+                    previous: previousItem,
                 })
             }
 
@@ -382,10 +391,13 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
 
             // Item is no longer listed at market at all
             const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
-            // TODO: look up old item prices buying and sell?
+
+            // previous sell price, sorted descending
+            const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
+
             events[itemId].push({
-                item: { rid: itemId, name, level, price: 0, p },
-                merchant: undefined,
+                item: previousItem.item,
+                merchant: previousItem.merchant,
                 type: "itemUnavailable",
             })
 
@@ -402,11 +414,13 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             if (!events[itemId]) events[itemId] = []
             // No merchants are selling this item anymore
             const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
-            // TODO: look up old item sell prices
-            // TODO: What about merchants still buying it?
+
+            // previous sell price, sorted descending
+            const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
+
             events[itemId].push({
-                item: { rid: itemId, name, level, price: 0, p },
-                merchant: undefined,
+                item: previousItem.item,
+                merchant: previousItem.merchant,
                 type: "itemNoLongerSold",
             })
         }
@@ -516,8 +530,9 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
 
             // TODO: one embed, with multiple merchant fields, we don't know the order of the events, group/ sort by type
             const embed = new EmbedBuilder()
-                .setTitle(`${style.emoji} ${itemName} (${event.item.name}) - ${style.title}`)
-                .setDescription(`*Event Type:* **${event.type}**\n${style.message}`)
+                .setTitle(`${style.emoji} ${itemName} (${event.item.name})`)
+                .setDescription(`**${style.title}**\n${style.message}`)
+                // .setDescription(`${style.title} - *Event Type:* **${event.type}**\n${style.message}`)
                 .setColor(style.color)
                 .setTimestamp()
 
@@ -527,11 +542,18 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
                     { name: "Merchant", value: `${event.merchant?.name}`, inline: true },
                     {
                         name: "🌍 Location",
-                        value: `${event.merchant?.server} | ${event.merchant?.map} (${event.merchant?.x}, ${event.merchant?.y})`,
+                        value: `${event.merchant?.server}\n${event.merchant?.map} (${event.merchant?.x}, ${event.merchant?.y})`,
                         inline: true,
                     },
-                    { name: "💰 Price", value: ` **${abbreviateNumber(event.item.price)} **`, inline: true },
                 )
+
+                const trend = event.previous ? `${getPriceTrend(event.item.price, event.previous.item.price)}` : ""
+
+                embed.addFields({
+                    name: "💰 Price",
+                    value: `${trend}\n**${abbreviateNumber(event.item.price)}**`,
+                    inline: true,
+                })
             }
 
             embeds.push(embed)
@@ -541,5 +563,20 @@ async function postEventsEmbeds(client: Client, tradeChannelId: string, events: 
     for (let i = 0; i < embeds.length; i += 10) {
         const batch = embeds.slice(i, i + 10)
         await tradeChannel.send({ embeds: batch })
+    }
+}
+
+function getPriceTrend(currentPrice: number, previousPrice: number): string {
+    const difference = currentPrice - previousPrice
+    const percentageChange = Math.abs((difference / previousPrice) * 100).toFixed(2)
+
+    if (difference > 0) {
+        // return `📈 +${difference}` // Diff Increase
+        return `📈 +${percentageChange}%` // % Increase
+    } else if (difference < 0) {
+        // return `📉 -${Math.abs(difference)}` // Diff Decrease
+        return `📉 -${percentageChange}%` // % Decrease
+    } else {
+        return "— No change" // No change
     }
 }
