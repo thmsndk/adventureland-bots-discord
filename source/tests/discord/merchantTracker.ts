@@ -582,20 +582,22 @@ async function postEventASCIIMessage(tradeChannel: TextChannel, events: Record<s
             const gItemName = AL.Game.G.items[event.item.name].name
             const itemName = `${itemLevel}${titleName}${gItemName}`
 
-            let eventMessage = `🔹 **${itemName}** (${event.item.name})\n`
             const style = eventTypeStyles[event.type]
+            let eventMessage = `🔹 **${itemName}** (${event.item.name}) ${style.emoji} **${style.title}**\n`
 
-            eventMessage += `\n${style.emoji} **${style.title}**: ${style.message}\n`
+            eventMessage += `${style.message}\n`
             if (event.merchant) {
-                eventMessage += `${event.merchant.name} 🌍 ${event.merchant.server}, ${event.merchant.map} (${event.merchant.x}, ${event.merchant.y})\n`
+                eventMessage += `${event.merchant.name} 🌍 ${event.merchant.server}, ${event.merchant.map} (${event.merchant.x}, ${event.merchant.y})`
             }
 
-            eventMessage += `💰 *Price*: ${abbreviateNumber(event.item.price)}`
+            eventMessage += ` 💰 *Price*: ${abbreviateNumber(event.item.price)}`
 
             if (event.previous) {
                 const trend = `${getPriceTrend(event.item.price, event.previous.item.price)}`
-                eventMessage += `${trend}\n`
+                eventMessage += ` ${trend}`
             }
+
+            eventMessage += "\n"
 
             // Check if adding this event would exceed the character limit
             if (currentMessage.length + eventMessage.length > maxMessageLength) {
