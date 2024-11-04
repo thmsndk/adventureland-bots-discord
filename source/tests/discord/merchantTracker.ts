@@ -574,7 +574,7 @@ async function postEventASCIIMessage(tradeChannel: TextChannel, events: Record<s
     currentMessage += "----------------------------------------\n"
 
     for (const [itemId, eventList] of Object.entries(events)) {
-        // Generate item name and details
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const [name, level, p]: [ItemName, number, TitleName] = itemId.split("_") as [ItemName, number, TitleName]
         for (const event of eventList) {
             const titleName = getTitleName(event.item, AL.Game.G) ? `${getTitleName(event.item, AL.Game.G)} ` : ""
@@ -585,39 +585,23 @@ async function postEventASCIIMessage(tradeChannel: TextChannel, events: Record<s
             let eventMessage = `🔹 **${itemName}** (${event.item.name})\n`
             const style = eventTypeStyles[event.type]
 
-            // Create ASCII table for merchant info
-            let merchantTable = "```\n"
-            merchantTable += "+----------------+----------------------+\n"
-            merchantTable += "| Merchant       | Location             |\n"
-            merchantTable += "+----------------+----------------------+\n"
-
+            eventMessage += `\n${style.emoji} **${style.title}**: ${style.message}\n`
             if (event.merchant) {
-                const merchantName = event.merchant.name.padEnd(15)
-                const location =
-                    `${event.merchant.server}, ${event.merchant.map} (${event.merchant.x}, ${event.merchant.y})`.padEnd(
-                        20,
-                    )
-                merchantTable += `| ${merchantName} | ${location} |\n`
-                merchantTable += "+----------------+----------------------+\n"
+                eventMessage += `${event.merchant.name} 🌍 ${event.merchant.server}, ${event.merchant.map} (${event.merchant.x}, ${event.merchant.y})\n`
             }
 
-            merchantTable += "```\n"
-
-            eventMessage += `\n${style.emoji} **${style.title}**: ${style.message}\n${merchantTable}`
+            eventMessage += `💰 *Price*: ${abbreviateNumber(event.item.price)}`
 
             if (event.previous) {
                 const trend = `${getPriceTrend(event.item.price, event.previous.item.price)}`
-                eventMessage += `📊 *Trend*: ${trend}\n`
+                eventMessage += `${trend}\n`
             }
-
-            eventMessage += "----------------------------------------\n"
 
             // Check if adding this event would exceed the character limit
             if (currentMessage.length + eventMessage.length > maxMessageLength) {
                 // Send the current message and start a new one
                 await tradeChannel.send(currentMessage)
-                currentMessage = "📢 **Merchant Tracker Update** 📢\n"
-                currentMessage += "----------------------------------------\n"
+                currentMessage = ""
             }
 
             // Add the event message to the current message
