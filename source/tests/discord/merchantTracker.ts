@@ -396,8 +396,8 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
 
             events[itemId].push({
-                item: previousItem.item,
-                merchant: previousItem.merchant,
+                item: previousItem?.item ?? { rid: itemId, name, level, price: 0, p },
+                merchant: previousItem?.merchant,
                 type: "itemUnavailable",
             })
 
@@ -419,8 +419,8 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             const previousItem = previousItemData.sell.sort((a, b) => a.item.price - b.item.price)[0]
 
             events[itemId].push({
-                item: previousItem.item,
-                merchant: previousItem.merchant,
+                item: previousItem?.item ?? { rid: itemId, name, level, price: 0, p },
+                merchant: previousItem?.merchant,
                 type: "itemNoLongerSold",
             })
         }
