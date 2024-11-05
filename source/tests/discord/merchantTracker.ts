@@ -329,7 +329,17 @@ function analyzeMerchantData(oldData: PullMerchantsCharData[], newData: PullMerc
             // If it's cheaper than existing buy orders it's a HOT DEAL
             // if it's more expensive, it's just being sold now
 
+            // TODO: duplicate slots causing the same message, e.g. 2x stinger restocked at the same price
+
             itemData.sell.forEach(({ merchant, item }) => {
+                const alreadyRegistered = events[itemId].find(
+                    (x) => x.item.name === item.name && x.merchant.name === merchant.name,
+                )
+
+                if (alreadyRegistered) {
+                    return
+                }
+
                 events[itemId].push({
                     item,
                     merchant,
