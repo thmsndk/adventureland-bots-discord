@@ -15,6 +15,7 @@ type TradeListing = ItemRef & { note?: string; wts?: TradeSide; wtb?: TradeSide 
 type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number }
 
 const DISCORD_CONTENT_LIMIT = 2000
+const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "https://aldata.earthiverse.ca").replace(/\/$/, "")
 
 function truncateDiscordContent(content: string): string {
     if (content.length <= DISCORD_CONTENT_LIMIT) return content
@@ -57,7 +58,7 @@ function formatBankSideLines(owner: string, sideLabel: "WTS" | "WTB", listing: T
 // TODO: How do I type this for autocomplete?
 export const Trade: Command & { autocomplete: (client: Client, interaction: AutocompleteInteraction) => void } = {
     name: "trade",
-    description: "Returns details about trades for an item (Data from https://aldata.earthiverse.ca)",
+    description: "Returns details about trades for an item (Data from ALData)",
     options: [
         {
             autocomplete: true,
@@ -103,8 +104,8 @@ export const Trade: Command & { autocomplete: (client: Client, interaction: Auto
 
         try {
             const [merchantsResponse, tradesResponse] = await Promise.all([
-                fetch("https://aldata.earthiverse.ca/merchants/"),
-                fetch("https://aldata.earthiverse.ca/trades")
+                fetch(`${ALDATA_BASE_URL}/merchants/`),
+                fetch(`${ALDATA_BASE_URL}/trades`)
             ])
 
             const merchantsOk = merchantsResponse.status === 200
