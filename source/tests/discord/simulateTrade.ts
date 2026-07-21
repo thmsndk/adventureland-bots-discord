@@ -22,10 +22,14 @@ type TradeSide = {
     trades?: TradeOffer[]
 }
 type TradeListing = ItemRef & { note?: string; wts?: TradeSide; wtb?: TradeSide }
-type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number }
+type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number; label?: string }
 
 const DISCORD_CONTENT_LIMIT = 2000
 const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "http://localhost:8080").replace(/\/$/, "")
+
+function ownerDisplayName(ownerTrades: OwnerTrades): string {
+    return ownerTrades.label || ownerTrades.owner
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const credentialsCandidates = [
@@ -146,10 +150,10 @@ async function buildTradeMessage(item: string): Promise<string> {
             for (const listing of ownerTrades.listings ?? []) {
                 if (listing.name !== item) continue
                 if (listing.wts) {
-                    bankWtsLines.push(...formatBankSideLines(ownerTrades.owner, "WTS", listing, listing.wts))
+                    bankWtsLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTS", listing, listing.wts))
                 }
                 if (listing.wtb) {
-                    bankWtbLines.push(...formatBankSideLines(ownerTrades.owner, "WTB", listing, listing.wtb))
+                    bankWtbLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTB", listing, listing.wtb))
                 }
             }
         }

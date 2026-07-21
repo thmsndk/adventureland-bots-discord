@@ -12,10 +12,15 @@ type TradeSide = {
     trades?: TradeOffer[]
 }
 type TradeListing = ItemRef & { note?: string; wts?: TradeSide; wtb?: TradeSide }
-type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number }
+type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number; label?: string; characters?: string[] }
 
 const DISCORD_CONTENT_LIMIT = 2000
 const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "https://aldata.earthiverse.ca").replace(/\/$/, "")
+
+function ownerDisplayName(ownerTrades: OwnerTrades): string {
+    if (ownerTrades.label) return ownerTrades.label
+    return ownerTrades.owner
+}
 
 function truncateDiscordContent(content: string): string {
     if (content.length <= DISCORD_CONTENT_LIMIT) return content
@@ -162,10 +167,10 @@ export const Trade: Command & { autocomplete: (client: Client, interaction: Auto
                     for (const listing of ownerTrades.listings ?? []) {
                         if (listing.name !== item) continue
                         if (listing.wts) {
-                            bankWtsLines.push(...formatBankSideLines(ownerTrades.owner, "WTS", listing, listing.wts))
+                            bankWtsLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTS", listing, listing.wts))
                         }
                         if (listing.wtb) {
-                            bankWtbLines.push(...formatBankSideLines(ownerTrades.owner, "WTB", listing, listing.wtb))
+                            bankWtbLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTB", listing, listing.wtb))
                         }
                     }
                 }
