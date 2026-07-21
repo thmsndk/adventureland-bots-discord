@@ -22,13 +22,26 @@ type TradeSide = {
     trades?: TradeOffer[]
 }
 type TradeListing = ItemRef & { note?: string; wts?: TradeSide; wtb?: TradeSide }
-type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number; label?: string }
+type OwnerTrades = {
+    owner: string
+    listings: TradeListing[]
+    lastUpdated?: number
+    label?: string
+    discordName?: string
+}
 
 const DISCORD_CONTENT_LIMIT = 2000
 const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "http://localhost:8080").replace(/\/$/, "")
 
 function ownerDisplayName(ownerTrades: OwnerTrades): string {
     return ownerTrades.label || ownerTrades.owner
+}
+
+/** Plain text only — never emit `<@id>` mention syntax. */
+function ownerBankPrefix(ownerTrades: OwnerTrades): string {
+    const name = ownerDisplayName(ownerTrades)
+    if (ownerTrades.discordName) return `${name} (Discord: ${ownerTrades.discordName})`
+    return name
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -150,10 +163,10 @@ async function buildTradeMessage(item: string): Promise<string> {
             for (const listing of ownerTrades.listings ?? []) {
                 if (listing.name !== item) continue
                 if (listing.wts) {
-                    bankWtsLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTS", listing, listing.wts))
+                    bankWtsLines.push(...formatBankSideLines(ownerBankPrefix(ownerTrades), "WTS", listing, listing.wts))
                 }
                 if (listing.wtb) {
-                    bankWtbLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTB", listing, listing.wtb))
+                    bankWtbLines.push(...formatBankSideLines(ownerBankPrefix(ownerTrades), "WTB", listing, listing.wtb))
                 }
             }
         }

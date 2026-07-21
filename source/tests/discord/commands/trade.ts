@@ -12,7 +12,15 @@ type TradeSide = {
     trades?: TradeOffer[]
 }
 type TradeListing = ItemRef & { note?: string; wts?: TradeSide; wtb?: TradeSide }
-type OwnerTrades = { owner: string; listings: TradeListing[]; lastUpdated?: number; label?: string; characters?: string[] }
+type OwnerTrades = {
+    owner: string
+    listings: TradeListing[]
+    lastUpdated?: number
+    label?: string
+    characters?: string[]
+    discordName?: string
+    discordId?: string
+}
 
 const DISCORD_CONTENT_LIMIT = 2000
 const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "https://aldata.earthiverse.ca").replace(/\/$/, "")
@@ -20,6 +28,16 @@ const ALDATA_BASE_URL = (process.env.ALDATA_URL ?? "https://aldata.earthiverse.c
 function ownerDisplayName(ownerTrades: OwnerTrades): string {
     if (ownerTrades.label) return ownerTrades.label
     return ownerTrades.owner
+}
+
+/**
+ * Plain-text owner prefix for bank lines.
+ * Never emit `<@id>` / mention syntax — the /trade bot must not ping listing owners.
+ */
+function ownerBankPrefix(ownerTrades: OwnerTrades): string {
+    const name = ownerDisplayName(ownerTrades)
+    if (ownerTrades.discordName) return `${name} (Discord: ${ownerTrades.discordName})`
+    return name
 }
 
 function truncateDiscordContent(content: string): string {
@@ -167,10 +185,10 @@ export const Trade: Command & { autocomplete: (client: Client, interaction: Auto
                     for (const listing of ownerTrades.listings ?? []) {
                         if (listing.name !== item) continue
                         if (listing.wts) {
-                            bankWtsLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTS", listing, listing.wts))
+                            bankWtsLines.push(...formatBankSideLines(ownerBankPrefix(ownerTrades), "WTS", listing, listing.wts))
                         }
                         if (listing.wtb) {
-                            bankWtbLines.push(...formatBankSideLines(ownerDisplayName(ownerTrades), "WTB", listing, listing.wtb))
+                            bankWtbLines.push(...formatBankSideLines(ownerBankPrefix(ownerTrades), "WTB", listing, listing.wtb))
                         }
                     }
                 }
