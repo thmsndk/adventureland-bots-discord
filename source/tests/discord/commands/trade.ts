@@ -33,10 +33,14 @@ function ownerDisplayName(ownerTrades: OwnerTrades): string {
 /**
  * Plain-text owner prefix for bank lines.
  * Never emit `<@id>` / mention syntax — the /trade bot must not ping listing owners.
+ * Only append Discord when it differs from the display label (avoids "earthiverse (Discord: earthiverse)").
  */
 function ownerBankPrefix(ownerTrades: OwnerTrades): string {
     const name = ownerDisplayName(ownerTrades)
-    if (ownerTrades.discordName) return `${name} (Discord: ${ownerTrades.discordName})`
+    const discord = ownerTrades.discordName?.trim()
+    if (discord && discord.toLowerCase() !== name.toLowerCase()) {
+        return `${name} (@${discord})`
+    }
     return name
 }
 

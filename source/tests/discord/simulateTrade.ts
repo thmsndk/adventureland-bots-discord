@@ -37,10 +37,13 @@ function ownerDisplayName(ownerTrades: OwnerTrades): string {
     return ownerTrades.label || ownerTrades.owner
 }
 
-/** Plain text only — never emit `<@id>` mention syntax. */
+/** Plain text only — never emit `<@id>` mention syntax. Only append when Discord differs from label. */
 function ownerBankPrefix(ownerTrades: OwnerTrades): string {
     const name = ownerDisplayName(ownerTrades)
-    if (ownerTrades.discordName) return `${name} (Discord: ${ownerTrades.discordName})`
+    const discord = ownerTrades.discordName?.trim()
+    if (discord && discord.toLowerCase() !== name.toLowerCase()) {
+        return `${name} (@${discord})`
+    }
     return name
 }
 
