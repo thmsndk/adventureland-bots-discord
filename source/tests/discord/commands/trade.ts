@@ -65,9 +65,9 @@ function formatBankSideLines(owner: string, sideLabel: "WTS" | "WTB", listing: T
     const note = side.note ?? listing.note
 
     if (side.price !== undefined) {
-        const obo = side.priceNegotiable ? " (OBO)" : ""
+        const negotiable = side.priceNegotiable ? " (negotiable)" : ""
         const notePart = note ? ` — ${note}` : ""
-        lines.push(`${owner} ${sideLabel} ${quantity}${metaPart}@ ${side.price.toLocaleString()}${obo}${notePart}`)
+        lines.push(`${owner} ${sideLabel} ${quantity}${metaPart}@ ${side.price.toLocaleString()}${negotiable}${notePart}`)
     }
 
     if (side.trades) {
